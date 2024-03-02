@@ -15,7 +15,6 @@ import numpy as np
 from dlclivegui import CameraProcess
 from dlclivegui.queue import ClearableQueue, ClearableMPQueue
 
-
 class DLCLiveProcessError(Exception):
     """
     Exception for incorrect use of DLC-live-GUI Process Manager
@@ -43,6 +42,7 @@ class CameraPoseProcess(CameraProcess):
         self.display_pose = None
         self.display_pose_queue = ClearableMPQueue(2, ctx=self.ctx)
         self.pose_process = None
+        self.dlc = None # Added by Jiaao
 
     def start_pose_process(self, dlc_params, timeout=300):
 
@@ -77,6 +77,8 @@ class CameraPoseProcess(CameraProcess):
         self.q_from_process.write(("pose", "end"))
 
     def _open_dlc_live(self, dlc_params):
+        # modified by JIAAO. Need to pass some other params to the custom processor
+        # which cannot be user-specified. (e.g. a pre-established arduino connection)
 
         from dlclive import DLCLive
 
@@ -91,35 +93,100 @@ class CameraPoseProcess(CameraProcess):
                 dlc_params["processor"] = proc_obj(**proc_params)
 
         self.dlc = DLCLive(**dlc_params)
+        super().set_processor(self.dlc.processor)
+        # Original code commented out by JIAAO
+        # if self.frame is not None:
+            # self.dlc.init_inference(
+                # self.frame, frame_time=self.frame_time[0], record=False
+            # )
+            # self.poses = []
+            # self.pose_times = []
+            # self.pose_frame_times = []
+            # ret = True
+        
+        # JIAAO
         if self.frame is not None:
-            self.dlc.init_inference(
-                self.frame, frame_time=self.frame_time[0], record=False
-            )
-            self.poses = []
-            self.pose_times = []
-            self.pose_frame_times = []
-            ret = True
+            # always record
+            # pose = self.dlc.init_inference(self.frame, frame_time=self.frame_time[0], record=True)
+            # self.poses = [pose]
+            # self.pose_times = [time.time()]
+            # self.pose_frame_times = [self.frame_time[0]]
+            # print(type(self.frame))
+            # print(self.frame)
+            # raise ValueError("DLC needs to be initiated before capturing frames")
+            print("Ignoring current self.frame data ...")
+        # else:
+        # kwargs is only passed to get_pose. No frame, no need for kwargs
+        print("[CameraPoseProcess] Initializing DLC inference")
+        self.dlc.init_inference()
+        self.poses = []
+        self.pose_times = []
+        self.pose_frame_times = []
+        ret = True
 
         return ret
 
     def _pose_loop(self):
         """ Conduct pose estimation using deeplabcut-live in loop
         """
-
+        
+        # added by Jiaao
+        self.camstart = np.frombuffer(self.camstart_shared.get_obj(), dtype="uint8").reshape(1)
+        camstate = 0
+        
         run = True
-        write = False
+        write = True # False # changed to True by JIAAO
         frame_time = 0
         pose_time = 0
         end_time = time.time()
 
         while run:
-
+            
+            cmd = self.q_to_process.read()
+            if cmd is not None:
+                # print("Command issued to pose_loop:", cmd)
+                if cmd[0] == "pose":
+                    if cmd[1] == "write":
+                        if cmd[2] == True:
+                            # JIAAO MODIFICATION: since WRITE is already True,
+                            # start_record button now sends the trigger
+                            write = True
+                            #d = self.dlc.processor.arduino_sendrecv(1)
+                            #print("Camera trigger sent", d)
+                        else:
+                            write = False
+                        self.q_from_process.write(cmd)
+                    elif cmd[1] == "save":
+                        ret = self._save_pose(cmd[2])
+                        self.q_from_process.write(cmd + (ret,))
+                    elif cmd[1] == "end":
+                        run = False
+                else:
+                    self.q_to_process.write(cmd)
+            # JIAAO
+            #camstart = self.camstart
+            # if camstate==0 and self.camstart[0]==1:
+                # print("Triggering video")
+                # self.dlc.processor.trig_video()
+                # camstate = 1
+            # ABOVE: JIAAO modification. In each loop, first service commands, then wait for frame
+            
             ref_time = frame_time if self.opt_rate else end_time
 
             if self.frame_time[0] > ref_time:
+                # Added by Jiaao
+                if self.dlc.processor is not None:
+                    if self.dlc.processor.count==self.dlc.processor.magic_num:
+                        print("Magic number reached")
+                self.dlc.processor.ts = time.time()
+                # END Added by Jiaao
 
                 frame = self.frame
                 frame_time = self.frame_time[0]
+                
+                if frame is None:
+                    continue
+                # END JIAAO
                 pose = self.dlc.get_pose(frame, frame_time=frame_time, record=write)
                 pose_time = time.time()
 
@@ -130,23 +197,13 @@ class CameraPoseProcess(CameraProcess):
                     self.pose_times.append(pose_time)
                     self.pose_frame_times.append(frame_time)
 
-                cmd = self.q_to_process.read()
-                if cmd is not None:
-                    if cmd[0] == "pose":
-                        if cmd[1] == "write":
-                            write = cmd[2]
-                            self.q_from_process.write(cmd)
-                        elif cmd[1] == "save":
-                            ret = self._save_pose(cmd[2])
-                            self.q_from_process.write(cmd + (ret,))
-                        elif cmd[1] == "end":
-                            run = False
-                    else:
-                        self.q_to_process.write(cmd)
+                
 
     def start_record(self, timeout=5):
 
         ret = super().start_record(timeout=timeout)
+        if ret ==False:
+            print("CameraProcess.start_record returned False") # added by Jiaao
 
         if (self.pose_process is not None) and (self.writer_process is not None):
             if (self.pose_process.is_alive()) and (self.writer_process.is_alive()):

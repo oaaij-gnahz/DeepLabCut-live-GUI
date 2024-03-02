@@ -10,12 +10,14 @@ import platform
 
 from dlclivegui.camera.camera import Camera, CameraError
 from dlclivegui.camera.opencv import OpenCVCam
+from dlclivegui.camera.basler import BaslerCam
 
 if platform.system() == "Windows":
     try:
         from dlclivegui.camera.tiscamera_windows import TISCam
     except Exception as e:
         pass
+        # print(e)
 
 if platform.system() == "Linux":
     try:
@@ -36,8 +38,3 @@ if platform.system() == "Darwin":
         from dlclivegui.camera.pseye import PSEyeCam
     except Exception as e:
         pass
-
-try:
-    from dlclivegui.camera.basler import BaslerCam
-except Exception as e:
-    pass

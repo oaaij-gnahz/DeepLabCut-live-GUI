@@ -29,6 +29,7 @@ import json
 import datetime
 import inspect
 import importlib
+import serial # added by Jiaao
 
 from PIL import Image, ImageTk, ImageDraw
 import colorcet as cc
@@ -37,6 +38,7 @@ from dlclivegui import CameraPoseProcess
 from dlclivegui import processor
 from dlclivegui import camera
 from dlclivegui.tkutil import SettingsWindow
+
 
 
 class DLCLiveGUI(object):
@@ -918,6 +920,17 @@ class DLCLiveGUI(object):
                 self.camera_entry["values"] = self.get_camera_names() + ("Add Camera",)
                 self.camera_name.set("")
                 self.save_config()
+    
+    # def trigger_start(self):
+        # """Send trigger to Arduino. Added by JIAAO"""
+        # if (self.cam_pose_proc is None) or (self.cam_pose_proc.dlc is None):
+            # messagebox.showerror(
+                # "Trigger start",
+                # "CamPoseProcess with DLC must be established first before acquisition!",
+                # parent=self.window
+            # )
+        # ret = serial_sendrecv(self.arduino, ARDUINO_CAM_PIN)
+        # print("Trigger Start signal byte:", ret)
 
     def browse_dlc_processor(self):
 
@@ -1251,7 +1264,7 @@ class DLCLiveGUI(object):
         self.window = Tk()
         self.window.title("DeepLabCut Live")
         cur_row = 0
-        combobox_width = 15
+        combobox_width = 30
 
         ### select cfg file
         if len(self.cfg_list) > 0:
@@ -1301,6 +1314,12 @@ class DLCLiveGUI(object):
         Button(self.window, text="Remove Camera", command=self.remove_cam_cfg).grid(
             sticky="nsew", row=cur_row, column=2
         )
+        # added by Jiaao
+        # cur_row += 1
+        # Button(self.window, text="Start Acquis.", command=self.trigger_start).grid(
+        #     sticky="nsew", row=cur_row, column=2
+        # )
+        # end Jiaao
 
         cur_row += 2
 

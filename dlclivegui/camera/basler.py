@@ -11,7 +11,9 @@ from imutils import rotate_bound
 import time
 
 from dlclivegui.camera import Camera, CameraError
-TIMEOUT = 100
+TIMEOUT = 1000
+
+
 
 def get_devices():
     tlFactory = pylon.TlFactory.GetInstance()
@@ -67,35 +69,64 @@ class BaslerCam(Camera):
         self.cam.Width.SetValue(self.im_size[0])
         self.cam.Height.SetValue(self.im_size[1])
 
-        self.cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+        # the following line is commented out by JIAAO.
+        # For better synchronization, we want to avoid starting acquisition here,
+        # and use a trigger later on.
+        # self.cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
         self.converter = pylon.ImageFormatConverter()
         self.converter.OutputPixelFormat = pylon.PixelType_BGR8packed
         self.converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
+        # JIAAO ADDED
+        # for k in dir(self.cam):
+            # print(k)
+        # input("......")
+        # print(dir(self.cam.UserSetSelector))
+        # print("====")
+        # print(self.cam.UserSetSelector.__doc__)
+        #str_val = self.cam.UserSetSelector.FromString("UserSet1").ToString()
+        #str_val = "UserSet1"
+        #self.cam.UserSetSelector.SetValue(str_val) # pylon.UserSetSelector_UserSet1);
+        # Usersets are defined in the Pylon GUI software and stored in camera.
+        # We use it for digital IO signal configurations
+        self.cam.UserSetSelector = "UserSet1"
+        print("Basler - Loading current UserSet:", self.cam.UserSetSelector.Value)
+        self.cam.UserSetLoad.Execute()
+        self.cam.AcquisitionFrameRate = 85 # slightly more than 80 FPS which is software polling rate
+        # END JIAAO ADDED
 
         return True
+    
+    def start_acquisition(self):
+        self.cam.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
 
     def get_image(self):
-        grabResult = self.cam.RetrieveResult(
-            TIMEOUT, pylon.TimeoutHandling_ThrowException)
-
+        # JIAAO EDITED
         frame = None
-
-        if grabResult.GrabSucceeded():
-
-            image = self.converter.Convert(grabResult)
-            frame = image.GetArray()
-
-            if self.rotate:
-                frame = rotate_bound(frame, self.rotate)
-            if self.crop:
-                frame = frame[self.crop[2]: self.crop[3],
-                              self.crop[0]: self.crop[1]]
-
-        else:
-
-            raise CameraError("Basler Camera did not return an image!")
-
-        grabResult.Release()
+        try:
+            grabResult = self.cam.RetrieveResult(
+                TIMEOUT, pylon.TimeoutHandling_ThrowException)
+            # print(dir(grabResult))
+            if not grabResult.IsValid():
+                return frame
+            if grabResult.GrabSucceeded():
+                image = self.converter.Convert(grabResult)
+                frame = image.GetArray()
+                if self.rotate:
+                    frame = rotate_bound(frame, self.rotate)
+                if self.crop:
+                    frame = frame[self.crop[2]: self.crop[3],
+                                  self.crop[0]: self.crop[1]]
+            else:
+                #JIAAO ADDED
+                pass
+                # raise CameraError("Basler Camera did not return an image!") # commented out by JIAAO
+                # END JIAAO ADDED
+            grabResult.Release()
+            
+        except Exception as e:
+            print("basler.get_image() timed out")
+            #print("Exception grabbing result:", type(e), "===========\n", e)
+            pass
 
         return frame
 

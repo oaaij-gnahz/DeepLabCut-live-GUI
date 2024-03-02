@@ -57,6 +57,13 @@ class CameraProcess(object):
         self.capture_process = None
         self.writer_process = None
 
+        self.camstart_shared = mp.Array(ctypes.c_uint8, 1)
+        self.camstart = np.frombuffer(self.camstart_shared.get_obj(), dtype="uint8").reshape(1)
+        np.copyto(self.camstart, np.array([0], dtype="uint8"))
+
+    def set_processor(self, processor):
+        self.processor = processor
+
     def start_capture_process(self, timeout=60):
 
         cmds = self.q_to_process.read(clear=True, position="all")
@@ -94,6 +101,8 @@ class CameraProcess(object):
         ret = self.device.set_capture_device()
         if not ret:
             raise CameraProcessError("Could not start capture device.")
+        else:
+            print("[CameraProcess] Started capture device.")
         self.q_from_process.write(("capture", "start", ret))
 
         self._capture_loop()
@@ -104,16 +113,38 @@ class CameraProcess(object):
     def _capture_loop(self):
         """ Acquires frames from frame capture device in a loop
         """
-
+        
+        # added by Jiaao
+        self.camstart = np.frombuffer(self.camstart_shared.get_obj(), dtype="uint8").reshape(1)
+        
         run = True
-        write = False
+        write = True
         last_frame_time = time.time()
 
         while run:
-
+            ### read commands
+            cmd = self.q_to_process.read()
+            if cmd is not None:
+                if cmd[0] == "capture":
+                    if cmd[1] == "write":
+                        write = cmd[2]
+                        if cmd[2] == True:
+                            self.device.start_acquisition()
+                            # for PoseProcess only
+                            #np.copyto(self.camstart, np.array([1], dtype="uint8"))
+                        self.q_from_process.write(cmd)
+                    elif cmd[1] == "end":
+                        run = False
+                else:
+                    self.q_to_process.write(cmd)
+            # ABOVE: Jiaao put "read commands" section before frame capturing
+            # So that this loop can respond to commands even when no frames are being captured
+            
             start_capture = time.time()
 
             frame, frame_time = self.device.get_image_on_time()
+            if frame is None:
+                continue
 
             write_capture = time.time()
 
@@ -131,17 +162,7 @@ class CameraProcess(object):
 
             last_frame_time = time.time()
 
-            ### read commands
-            cmd = self.q_to_process.read()
-            if cmd is not None:
-                if cmd[0] == "capture":
-                    if cmd[1] == "write":
-                        write = cmd[2]
-                        self.q_from_process.write(cmd)
-                    elif cmd[1] == "end":
-                        run = False
-                else:
-                    self.q_to_process.write(cmd)
+            
 
     def stop_capture_process(self):
 
@@ -287,7 +308,9 @@ class CameraProcess(object):
         ret = False
 
         if (self.capture_process is not None) and (self.writer_process is not None):
+            #print("CameraProcess: both capture_process and writer_process are set up.") # jiaao
             if self.capture_process.is_alive() and self.writer_process.is_alive():
+                #print("CameraProcess: both capture_process and writer_process are OK.") # jiaao
                 self.q_to_process.write(("capture", "write", True))
 
                 stime = time.time()
@@ -299,6 +322,8 @@ class CameraProcess(object):
                             break
                         else:
                             self.q_from_process.write(cmd)
+                if time.time() - stime > timeout:
+                    print("CameraProcess.start_record() timed out")
 
         return ret
 
