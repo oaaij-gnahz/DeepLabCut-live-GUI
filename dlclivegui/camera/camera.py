@@ -5,6 +5,7 @@ DeepLabCut Toolbox (deeplabcut.org)
 Licensed under GNU Lesser General Public License v3.0
 """
 
+FLIP_FRAME_HORIZONTALLY = True # True when animal is facing right (when we want to focus on the right limb)
 
 import cv2
 import time
@@ -73,6 +74,13 @@ class Camera(object):
         self.use_tk_display = use_tk_display
         self.display_resize = display_resize if display_resize else 1.0
         self.next_frame = 0
+        if FLIP_FRAME_HORIZONTALLY:
+            print("\n=========================================================================================================")
+            print("  FLIP_FRAME_HORIZONTALLY is set, this is for when the animal is actually facing right.")
+            print("  In that case this manuver will horizontally flip the frame so that it looks like animal is facing left.")
+            print("  Because the trained DLC model prefers it that way.")
+            print("  Please confirm whether it is intended and modify in dlclivegui/camera/camera.py")
+            print("=========================================================================================================\n")
 
     def set_im_size(self, res):
         """[summary]
@@ -123,7 +131,8 @@ class Camera(object):
         self.next_frame = max(
             self.next_frame + 1.0 / self.fps, cur_time + 0.5 / self.fps
         )
-
+        if FLIP_FRAME_HORIZONTALLY and frame is not None:
+            frame = frame[:,::-1, :]
         return frame, timestamp
 
     def get_image(self):
