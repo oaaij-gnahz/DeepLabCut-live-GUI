@@ -469,7 +469,7 @@ class DLCLiveGUI(object):
 
                 if pose is not None:
 
-                    im_size = (frame.shape[1], frame.shape[0])
+                    im_size = (frame.shape[0], frame.shape[1])
 
                     if not self.display_colors:
                         self.set_display_colors(pose.shape[0])
@@ -506,7 +506,7 @@ class DLCLiveGUI(object):
                                     outline=self.display_colors[i],
                                 )
                             except Exception as e:
-                                print(e)
+                                print(e, x0, x1, im_size[1])
 
                 imgtk = ImageTk.PhotoImage(image=img)
                 self.display_frame_label.imgtk = imgtk
