@@ -171,6 +171,10 @@ class CameraPoseProcess(CameraProcess):
                 # camstate = 1
             # ABOVE: JIAAO modification. In each loop, first service commands, then wait for frame
             
+            # Jiaao interpretation: 
+            # - if optimize for rate: then don't block waiting for pose; run DLC for every frame captured
+            # - else: (?) run DLC only for the next frame captured AFTER DLC is finished on current frame
+            # question: end_time never updates. TF does it even do? Does DLC only infer on images captured after it has been initiated? Does not make much sense to me
             ref_time = frame_time if self.opt_rate else end_time
 
             if self.frame_time[0] > ref_time:
@@ -189,6 +193,7 @@ class CameraPoseProcess(CameraProcess):
                 # END JIAAO
                 pose = self.dlc.get_pose(frame, frame_time=frame_time, record=write)
                 pose_time = time.time()
+                end_time = pose_time # JIAAO edit according to his interpretation above
 
                 self.display_pose_queue.write(pose, clear=True)
 
