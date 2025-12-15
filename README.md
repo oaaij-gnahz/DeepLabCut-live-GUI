@@ -14,6 +14,17 @@ GUI to run [DeepLabCut-live](https://github.com/DeepLabCut/DeepLabCut-live) on a
 
 ## [Installation Instructions](docs/install.md)
 
+## Features on this fork
+- Support for multiple cameras.
+
+- Tested: multiple cameras streaming and saving;
+
+- TODO:
+  - Test DLC for multiple cameras
+  - Tidy up Basler initialization of parameter sets to load.
+  - Camera horizontal flip logic
+  - (Personal) highest throughput / latency achieavable for two cams
+
 ## Getting Started
 
 #### Open DeepLabCut-live-GUI

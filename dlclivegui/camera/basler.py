@@ -11,7 +11,7 @@ from imutils import rotate_bound
 import time
 
 from dlclivegui.camera import Camera, CameraError
-TIMEOUT = 1000
+TIMEOUT = 50 # 1000
 
 
 
@@ -91,7 +91,9 @@ class BaslerCam(Camera):
         self.cam.UserSetSelector = "UserSet1"
         print("Basler - Loading current UserSet:", self.cam.UserSetSelector.Value)
         self.cam.UserSetLoad.Execute()
-        self.cam.AcquisitionFrameRate = 85 # slightly more than 80 FPS which is software polling rate
+        self.cam.AcquisitionFrameRate = int(1.2*self.fps) # slightly more than 80 FPS which is software polling rate
+        self.cam.Width.SetValue(self.im_size[0])
+        self.cam.Height.SetValue(self.im_size[1])
         # END JIAAO ADDED
 
         return True
@@ -125,7 +127,7 @@ class BaslerCam(Camera):
             
         except Exception as e:
             print("basler.get_image() timed out")
-            #print("Exception grabbing result:", type(e), "===========\n", e)
+            print("Exception grabbing result:", type(e), "===========\n", e)
             pass
 
         return frame

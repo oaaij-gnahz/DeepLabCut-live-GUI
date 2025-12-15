@@ -102,7 +102,7 @@ class DLCLiveGUI(object):
         # self.dlc_proc_params = None
         self.cam_pose_procs = OrderedDict() # None
         self.dlc_proc_params = OrderedDict() # None
-
+        self.cam_save_basenames = OrderedDict()
         self.display_windows = OrderedDict() # None
         self.display_cmap = None
         self.display_colors = OrderedDict()
@@ -243,7 +243,7 @@ class DLCLiveGUI(object):
         """ Initialize camera
         """
         this_cam_name = self.camera_name.get()
-        if self.cam_pose_procs[this_cam_name] is not None:
+        if (this_cam_name in self.cam_pose_procs) and (self.cam_pose_procs[this_cam_name] is not None):
             messagebox.showerror(
                 "Camera Exists",
                 "Camera already exists! Please close current camera before initializing a new one.",
@@ -1205,6 +1205,7 @@ class DLCLiveGUI(object):
             base_name = os.path.normpath(
                 f"{self.out_dir}/{cam_name.replace(' ', '')}_{self.subject.get()}_{date}_{self.attempt.get()}"
             )
+            self.cam_save_basenames[cam_name] = base_name
             # self.vid_file = os.path.normpath(self.out_dir + '/VIDEO_' + self.base_name + '.avi')
             # self.ts_file = os.path.normpath(self.out_dir + '/TIMESTAMPS_' + self.base_name + '.pickle')
             # self.dlc_file = os.path.normpath(self.out_dir + '/DLC_' + self.base_name + '.h5')
@@ -1223,6 +1224,7 @@ class DLCLiveGUI(object):
                     return
             ### start writer
             ret = cam_pose_proc.start_writer_process(base_name)
+            print("Starting CamPoseProcess for camera %s" % (cam_name))
 
         ### set GUI to Ready
         self.session_setup_window.destroy()
@@ -1312,7 +1314,7 @@ class DLCLiveGUI(object):
             ret_pose_by_cam = []
             for cam_name, cam_pose_proc in filter(lambda x: x[1] is not None, self.cam_pose_procs.items()):
                 ret = cam_pose_proc.stop_writer_process(save=True)
-                ret_pose = cam_pose_proc.save_pose(self.base_name)
+                ret_pose = cam_pose_proc.save_pose(self.cam_save_basenames[cam_name])
                 if (ret and ret_pose):
                     print("DLCLIVEGUI INFO - Video, timestamp, and DLC files have been saved for camera %s" % (cam_name))
                 elif ret:
